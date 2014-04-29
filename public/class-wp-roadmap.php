@@ -1,26 +1,15 @@
 <?php
 /**
- * WP Projects
+ * WP Roadmaps
  *
- * @package   WP Projects
+ * @package   WP Roadmap
  * @author    Paul Kilmurray <paul@kilbot.com.au>
  * @license   GPL-2.0+
  * @link      http://www.kilbot.com.au
  * @copyright 2014 Paul Kilmurray
  */
 
-/**
- * Plugin class. This class should ideally be used to work with the
- * public-facing side of the WordPress site.
- *
- * If you're interested in introducing administrative or dashboard
- * functionality, then refer to `class-plugin-name-admin.php`
- *
- * @package WP_Projects_Admin
- * @author  Paul Kilmurray <paul@kilbot.com.au>
- */
-
-class WP_Projects {
+class WP_Roadmap {
 				
 	/**
 	 * Plugin version, used for cache-busting of style and script file references.
@@ -45,7 +34,7 @@ class WP_Projects {
 	 *
 	 * @var      string
 	 */
-	protected $plugin_slug = 'wp-projects';
+	protected $plugin_slug = 'wp-roadmap';
 
 	/**
 	 * Instance of this class.
@@ -77,8 +66,6 @@ class WP_Projects {
 		add_action( 'init', array( $this, 'create_cpt' ) );
 		add_action( 'init', array( $this, 'create_cpt_taxonomies' ) );
 		add_action( 'init', array( $this, 'create_rewrite_rules' ) );
-
-		add_filter( 'post_type_link', array( $this, 'wp_projects_permalinks' ), 10, 2 );
 
 	}
 
@@ -129,23 +116,41 @@ class WP_Projects {
 	/**
 	 * Fired when the plugin is activated.
 	 */
-	public function activate( ) {
-	    // First, we "add" the custom post type via the above written function.
-	    // Note: "add" is written with quotes, as CPTs don't get added to the DB,
-	    // They are only referenced in the post_type column with a post entry, 
-	    // when you add a post of this CPT.
-	    $this->create_cpt();
+	static function activate( ) {
+		// set up the custom taxonomies
+		self::create_cpt_taxonomies();
 
-	    // ATTENTION: This is *only* done during plugin activation hook in this example!
-	    // You should *NEVER EVER* do this on every page load!!
-	    flush_rewrite_rules();
+		// insert default status terms
+		if(! term_exists( 'open', 'status') ) 
+			wp_insert_term('Open', 'status', array( 'description'=> 'Shown on the Roadmap archive', 'slug' => 'open' ) );	
+		if(! term_exists( 'closed', 'status') ) 
+			wp_insert_term('Closed', 'status', array( 'description'=> 'Not shown on the Roadmap archive', 'slug' => 'closed' ) );	
+		if(! term_exists( 'known-bugs', 'status') ) 
+			wp_insert_term('Known Bugs', 'status', array( 'description'=> 'Stick to the top of the Roadmap archive', 'slug' => 'known-bugs' ) );	
+		if(! term_exists( 'future-release', 'status') ) 
+			wp_insert_term('Future Release', 'status', array( 'description'=> 'Stick to the bottom of the Roadmap archive', 'slug' => 'future-release' ) );	
+
+		// insert default labels
+		if(! term_exists( 'enhancement', 'label') ) 
+			wp_insert_term('Enhancement', 'label', array( 'description'=> '', 'slug' => 'enhancement' ) );	
+		if(! term_exists( 'bug', 'label') ) 
+			wp_insert_term('Bug', 'label', array( 'description'=> '', 'slug' => 'bug' ) );
+
+		// set up the custom rewrites
+		self::create_rewrite_rules();
+		
+		// flush the rewrites
+		flush_rewrite_rules();
+
 	}
 
 	/**
 	 * Fired when the plugin is deactivated.
 	 */
-	public static function deactivate( ) {
+	static function deactivate( ) {
 
+		// flush the rewrites
+		flush_rewrite_rules();
 	}
 
 	/**
@@ -168,26 +173,24 @@ class WP_Projects {
 
 	/**
 	 * Create Custom Post Types
-	 * There are two CPT: Projects and Issues
-	 * Projects are pages, stand alone silos to hold project data
-	 * Issues are posts with a relationship to a Project page
+	 * There are two CPT: Roadmaps and Issues
 	 */
-	public function create_cpt() {
+	static function create_cpt() {
 		$labels = array(
-			'name'               => _x( 'Projects', 'post type general name', 'wp-projects-textdomain' ),
-			'singular_name'      => _x( 'Project', 'post type singular name', 'wp-projects-textdomain' ),
-			'menu_name'          => _x( 'Projects', 'admin menu', 'wp-projects-textdomain' ),
-			'name_admin_bar'     => _x( 'Project', 'add new on admin bar', 'wp-projects-textdomain' ),
-			'add_new'            => _x( 'Add New Project', 'project', 'wp-projects-textdomain' ),
-			'add_new_item'       => __( 'Add New Project', 'wp-projects-textdomain' ),
-			'new_item'           => __( 'New Project', 'wp-projects-textdomain' ),
-			'edit_item'          => __( 'Edit Project', 'wp-projects-textdomain' ),
-			'view_item'          => __( 'View Project', 'wp-projects-textdomain' ),
-			'all_items'          => __( 'Projects', 'wp-projects-textdomain' ),
-			'search_items'       => __( 'Search Projects', 'wp-projects-textdomain' ),
-			'parent_item_colon'  => __( 'Parent Project:', 'wp-projects-textdomain' ),
-			'not_found'          => __( 'No Projects found.', 'wp-projects-textdomain' ),
-			'not_found_in_trash' => __( 'No Projects found in Trash.', 'wp-projects-textdomain' ),
+			'name'               => _x( 'Milestones', 'post type general name', 'wp-projects-textdomain' ),
+			'singular_name'      => _x( 'Milestone', 'post type singular name', 'wp-projects-textdomain' ),
+			'menu_name'          => _x( 'Roadmap', 'admin menu', 'wp-projects-textdomain' ),
+			'name_admin_bar'     => _x( 'Milestone', 'add new on admin bar', 'wp-projects-textdomain' ),
+			'add_new'            => _x( 'Add New Milestone', 'project', 'wp-projects-textdomain' ),
+			'add_new_item'       => __( 'Add New Milestone', 'wp-projects-textdomain' ),
+			'new_item'           => __( 'New Milestone', 'wp-projects-textdomain' ),
+			'edit_item'          => __( 'Edit Milestone', 'wp-projects-textdomain' ),
+			'view_item'          => __( 'View Milestone', 'wp-projects-textdomain' ),
+			'all_items'          => __( 'Milestones', 'wp-projects-textdomain' ),
+			'search_items'       => __( 'Search Milestones', 'wp-projects-textdomain' ),
+			'parent_item_colon'  => __( 'Parent Milestone:', 'wp-projects-textdomain' ),
+			'not_found'          => __( 'No Milestones found.', 'wp-projects-textdomain' ),
+			'not_found_in_trash' => __( 'No Milestones found in Trash.', 'wp-projects-textdomain' ),
 		);
 
 		$args = array(
@@ -197,12 +200,12 @@ class WP_Projects {
 			'show_ui'            => true,
 			'show_in_menu'       => true,
 			'query_var'          => true,
-			'rewrite'            => false,  // handled by wp_projects_permalinks
+			'rewrite'            => array( 'slug' => 'roadmap' ),
 			'capability_type'    => 'page',
 			'has_archive'        => true,
 			'hierarchical'       => true,
 			'menu_position'      => 20,
-			'menu_icon' 		 => 'dashicons-hammer',
+			'menu_icon' 		 => 'dashicons-flag',
 			'supports'           => array( 
 										'title', 
 										'editor', 
@@ -212,9 +215,9 @@ class WP_Projects {
 										'sticky', 
 										'page-attributes'
 									),
+			'taxonomies'		=> array( 'status' ),
 		);
-
-		register_post_type( 'project', $args );
+		register_post_type( 'roadmap', $args );
 
 		$labels = array(
 			'name'               => _x( 'Issues', 'post type general name', 'wp-projects-textdomain' ),
@@ -238,9 +241,9 @@ class WP_Projects {
 			'public'             => true,
 			'publicly_queryable' => true,
 			'show_ui'            => true,
-			'show_in_menu'       => 'edit.php?post_type=project',
+			'show_in_menu'       => 'edit.php?post_type=roadmap',
 			'query_var'          => true,
-			'rewrite'            => false, // handled by wp_projects_permalinks
+			'rewrite'            => array( 'slug' => 'roadmap/issue' ), // handled by wp_projects_permalinks
 			'capability_type'    => 'post',
 			'has_archive'        => true,
 			'hierarchical'       => false,
@@ -260,8 +263,36 @@ class WP_Projects {
 
 	}
 
+	/**
+	 * Create CPT taxonomies
+	 * 
+	 */
+	static function create_cpt_taxonomies() {
+		// Add new taxonomy, make it hierarchical (like categories)
+		$labels = array(
+			'name'              => _x( 'Status', 'taxonomy general name' ),
+			'singular_name'     => _x( 'Status', 'taxonomy singular name' ),
+			'search_items'      => __( 'Search Status' ),
+			'all_items'         => __( 'All Status' ),
+			'parent_item'       => __( 'Parent Status' ),
+			'parent_item_colon' => __( 'Parent Status:' ),
+			'edit_item'         => __( 'Edit Status' ),
+			'update_item'       => __( 'Update Status' ),
+			'add_new_item'      => __( 'Add New Status' ),
+			'new_item_name'     => __( 'New Status Name' ),
+			'menu_name'         => __( 'Status' ),
+		);
 
-	public function create_cpt_taxonomies() {
+		$args = array(
+			'hierarchical'      => true,
+			'labels'            => $labels,
+			'show_ui'           => true,
+			'show_admin_column' => true,
+			'query_var'         => true,
+			'rewrite'           => array( 'slug' => 'roadmap/status' ),
+		);
+		register_taxonomy( 'status', array( 'roadmap' ), $args );
+
 		// Add new taxonomy, make it hierarchical (like categories)
 		$labels = array(
 			'name'              => _x( 'Milestones', 'taxonomy general name' ),
@@ -283,13 +314,10 @@ class WP_Projects {
 			'show_ui'           => true,
 			'show_admin_column' => true,
 			'query_var'         => true,
-			'rewrite'           => false,  // handled by wp_projects_permalinks
+			'rewrite'           => array( 'slug' => 'roadmap/issue/milestone' ),
 		);
-
 		register_taxonomy( 'milestone', array( 'issue' ), $args );
 		
-
-
 		// Add new taxonomy, NOT hierarchical (like tags)
 		$labels = array(
 			'name'                       => _x( 'Labels', 'taxonomy general name' ),
@@ -317,35 +345,20 @@ class WP_Projects {
 			'show_admin_column'     => true,
 			'update_count_callback' => '_update_post_term_count',
 			'query_var'             => true,
-			'rewrite'               => false,  // handled by wp_projects_permalinks
+			'rewrite'           	=> array( 'slug' => 'roadmap/issue/label' ),
 		);
-
 		register_taxonomy( 'label', 'issue', $args );
 
 	}
 
-	public function create_rewrite_rules() {
-		global $wp_rewrite;
+	static function create_rewrite_rules() {
 
-		// add rewrite tag for project
-		$wp_rewrite->add_rewrite_tag('%project%', '([^/]+)', 'project=');
-		$wp_rewrite->add_rewrite_tag('%issue%', '([^/]+)', 'issue=');
-		// $wp_rewrite->add_rewrite_tag('%milestone%', '([^/]+)', 'milestone=');
-		// $wp_rewrite->add_rewrite_tag('%label%', '([^/]+)', 'label=');
+		// prefix with roadmap slug, must by in the right order
+		add_rewrite_rule('^roadmap/status/([^/]*)/?','index.php?status=$matches[1]','top');
+		add_rewrite_rule('^roadmap/issue/label/([^/]*)/?','index.php?label=$matches[1]','top');
+		add_rewrite_rule('^roadmap/issue/milestone/([^/]*)/?','index.php?milestone=$matches[1]','top');
+		add_rewrite_rule('^roadmap/issue/([^/]*)/?','index.php?post_type=issue&name=$matches[1]','top');
 
-		$wp_rewrite->add_permastruct('issue', '/%project%/issue/%issue%', false);
-
-
-	}
-
-	public function wp_projects_permalinks( $permalink, $post ) {
-		if( 'issue' == get_post_type( $post ) ) {
-			$project = get_field( 'project', $post->ID );
-			if( $project && in_array( $project->post_status, array('publish', 'private') ) ) {
-				$permalink = str_replace( '%project%', $project->post_name , $permalink );
-			}
-		}
-		return $permalink;
 	}
 
 	/**

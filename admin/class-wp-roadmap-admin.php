@@ -1,25 +1,15 @@
 <?php
 /**
- * WP Projects
+ * WP Roadmap
  *
- * @package   WP Projects
+ * @package   WP Roadmap
  * @author    Paul Kilmurray <paul@kilbot.com.au>
  * @license   GPL-2.0+
  * @link      http://www.kilbot.com.au
  * @copyright 2014 Paul Kilmurray
  */
 
-/**
- * Plugin class. This class should ideally be used to work with the
- * administrative side of the WordPress site.
- *
- * If you're interested in introducing public-facing
- * functionality, then refer to `class-plugin-name.php`
- *
- * @package WP_Projects_Admin
- * @author  Paul Kilmurray <paul@kilbot.com.au>
- */
-class WP_Projects_Admin {
+class WP_Roadmap_Admin {
 
 	/**
 	 * Instance of this class.
@@ -77,8 +67,7 @@ class WP_Projects_Admin {
 		 * http://codex.wordpress.org/Plugin_API#Hooks.2C_Actions_and_Filters
 		 */
 		add_action( 'admin_init', array( $this, 'sanity_check' ) );
-		add_action( 'admin_init', array( $this, 'register_acf' ) );
-		add_action( 'admin_menu', array( $this, 'create_admin_menu' ) );
+		add_action( 'admin_menu', array( $this, 'custom_admin_submenu' ) );
 
 		add_filter( 'default_hidden_meta_boxes', array( $this , 'change_default_hidden_meta' ), 10, 2 );
 
@@ -218,32 +207,29 @@ class WP_Projects_Admin {
 	 * [create_admin_menu description]
 	 * @return [type] [description]
 	 */
-	public function create_admin_menu() {
-		add_submenu_page('edit.php?post_type=project', 'Milestones', 'Milestones', 'manage_options', 'edit-tags.php?post_type=issue&taxonomy=milestone'); 
-		add_submenu_page('edit.php?post_type=project', 'Labels', 'Labels', 'manage_options', 'edit-tags.php?post_type=issue&taxonomy=label'); 
+	public function custom_admin_submenu() {
+		add_submenu_page('edit.php?post_type=roadmap', 'Labels', 'Labels', 'manage_options', 'edit-tags.php?post_type=issue&taxonomy=label'); 
+		add_submenu_page('edit.php?post_type=roadmap', 'Milestones', 'Milestones', 'manage_options', 'edit-tags.php?post_type=issue&taxonomy=milestone'); 
+		remove_submenu_page( 'edit.php?post_type=roadmap', 'post-new.php?post_type=roadmap' );
 
-		// tidy up the menu
-		add_action('parent_file', array( $this, 'admin_menu_correction' ) );
-
+		// // tidy up the admin menu
+		add_action('parent_file', array( $this, 'admin_submenu_correction' ) );
 	}
 
 	/**
 	 * [admin_menu_correction description]
 	 * @param  string $parent_file [description]
 	 */
-	function admin_menu_correction($parent_file) {
+	function admin_submenu_correction($parent_file) {
 		global $current_screen, $submenu_file;
-		$taxonomy = $current_screen->taxonomy;
-		$post_type = $current_screen->post_type;
-
-		// remove the default "Add New" submenu for custom post type Project (personal preference)
-		remove_submenu_page( 'edit.php?post_type=project', 'post-new.php?post_type=project' );
-		if ( $post_type == 'project' ) 
-			$submenu_file = 'edit.php?post_type=project';
+		
+		if ( $current_screen->post_type == 'roadmap' &&  $current_screen->action == 'add' ) {
+			$submenu_file = 'edit.php?post_type=roadmap';
+		}
 		
 		// add .current to the appropiate submenu item
-		if ( $post_type == 'issue' ) {
-			switch ($taxonomy) {
+		if ( $current_screen->post_type == 'issue' ) {
+			switch ($current_screen->taxonomy) {
 			    case "milestone":
 			        $submenu_file = 'edit-tags.php?post_type=issue&taxonomy=milestone';
 			        break;
@@ -255,74 +241,22 @@ class WP_Projects_Admin {
 			}
 		}
 
-		// add .wp-has-current-submenu to the Projects menu when custom taxonomies are being used
-		if ( $taxonomy == 'milestone' || $taxonomy == 'label' )
-			$parent_file = 'edit.php?post_type=project';
+		// add .wp-has-current-submenu to the Roadmap menu when custom taxonomies are being used
+		if ( $current_screen->taxonomy == 'milestone' || $current_screen->taxonomy == 'label' )
+			$parent_file = 'edit.php?post_type=roadmap';
 
 		return $parent_file;
 	}
 
 
 	public function change_default_hidden_meta( $hidden, $screen) {
-		if ( 'project' == $screen->id ) {
+		if ( 'roadmap' == $screen->id ) {
         	$hidden = array( 'postcustom', 'commentstatusdiv', 'slugdiv', 'authordiv' );
     	}
     	if ( 'issue' == $screen->id ) {
         	$hidden = array( 'postcustom', 'commentstatusdiv', 'slugdiv', 'authordiv', 'pageparentdiv' );
     	}
     	return $hidden;
-	}
-
-	/**
-	 * 
-	 * @return [type] [description]
-	 */
-	public function register_acf() {
-
-		// piggy back on ACF: http://www.advancedcustomfields.com/ 
-		include_once( ABSPATH . '/wp-content/plugins/advanced-custom-fields/acf.php');
-		define( 'ACF_LITE', true );		
-
-		if( function_exists ( "register_field_group" ) ) {
-			register_field_group(array (
-				'id' => 'acf_projects',
-				'title' => 'Project',
-				'fields' => array (
-					array (
-						'key' => 'field_535c5d98bea8b',
-						'label' => 'Assign to a project:',
-						'name' => 'project',
-						'type' => 'post_object',
-						'post_type' => array (
-							0 => 'project',
-						),
-						'taxonomy' => array (
-							0 => 'all',
-						),
-						'allow_null' => 0,
-						'multiple' => 0,
-					),
-				),
-				'location' => array (
-					array (
-						array (
-							'param' => 'post_type',
-							'operator' => '==',
-							'value' => 'issue',
-							'order_no' => 0,
-							'group_no' => 0,
-						),
-					),
-				),
-				'options' => array (
-					'position' => 'side',
-					'layout' => 'default',
-					'hide_on_screen' => array (
-					),
-				),
-				'menu_order' => 0,
-			));
-		}
 	}
 
 	/**
@@ -339,7 +273,7 @@ class WP_Projects_Admin {
 		// check if ACF is installed
 		if ( !is_plugin_active( 'advanced-custom-fields/acf.php' ) ) {
 			$this->msg_type = 'error';
-			$this->msg 		= '<strong>WP Projects</strong> requires <a href="http://www.advancedcustomfields.com/">Advanced Custom Fields</a> to work correctly.';
+			$this->msg 		= '<strong>WP Roadmap</strong> requires <a href="http://www.advancedcustomfields.com/">Advanced Custom Fields</a> to work correctly.';
 			add_action( 'admin_notices', array( $this, 'admin_notices' ), 10, 2 );
 		}
 	}
